@@ -68,6 +68,65 @@ p {
   gap: 10px;
 }
 
+.summary-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(8, minmax(110px, 1fr));
+  margin-bottom: 10px;
+}
+
+.summary-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.summary-item span,
+.section-title span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.summary-item strong {
+  color: var(--text);
+  display: block;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.receive-history {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+
+.section-title {
+  align-items: center;
+  background: var(--panel-2);
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+}
+
+.history-table {
+  min-width: 860px;
+}
+
+.history-label {
+  min-width: 320px;
+  white-space: normal;
+}
+
+.empty-state {
+  color: var(--muted);
+  text-align: center;
+}
+
 .device {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -167,6 +226,10 @@ tbody tr.active-cluster td {
 }
 
 @media (max-width: 760px) {
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .device-header {
     grid-template-columns: 1fr 1fr;
   }

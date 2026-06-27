@@ -1,5 +1,7 @@
 const devicesEl = document.getElementById("devices");
 const healthEl = document.getElementById("health");
+const healthSummaryEl = document.getElementById("health-summary");
+const receiveHistoryEl = document.getElementById("receive-history");
 const subtitleEl = document.getElementById("subtitle");
 
 function mhz(value) {
@@ -49,10 +51,87 @@ function clusterState(cluster) {
   return (cluster.channels || []).some(channel => channel.state === "open") ? "open" : "idle";
 }
 
+function collectChannels(status) {
+  const rows = [];
+  for (const device of status.devices || []) {
+    for (const cluster of device.clusters || []) {
+      for (const channel of cluster.channels || []) {
+        rows.push({
+          ...channel,
+          cluster_index: cluster.index,
+          cluster_center: cluster.center_frequency,
+          device_index: device.index,
+          scanning: cluster.index === device.current_cluster,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+function renderHealthSummary(status) {
+  const devices = status.devices || [];
+  const statusAgeMs = Math.max(0, Date.now() - status.timestamp_ms);
+  const clusterDevices = devices.filter(device => device.mode === "cluster_scan");
+  const inputOverflows = devices.reduce((sum, device) => sum + (device.input_overflows || 0), 0);
+  const outputOverruns = devices.reduce((sum, device) => sum + (device.output_overruns || 0), 0);
+  const activeChannels = collectChannels(status).filter(channel => channel.state === "open").length;
+  const primaryDevice = clusterDevices[0] || devices[0] || {};
+  const currentCluster = primaryDevice.cluster_count
+    ? `${(primaryDevice.current_cluster || 0) + 1}/${primaryDevice.cluster_count}`
+    : "n/a";
+  const scanTimes = (primaryDevice.clusters || []).map(cluster => cluster.last_scan_ms).filter(Boolean);
+  const sweepAge = scanTimes.length ? ageText(Math.min(...scanTimes)) : "never";
+
+  healthSummaryEl.innerHTML = `
+    <div class="summary-item"><span>Airband</span><strong>${statusAgeMs < 3000 ? "alive" : "stale"}</strong></div>
+    <div class="summary-item"><span>Status age</span><strong>${ageText(status.timestamp_ms)}</strong></div>
+    <div class="summary-item"><span>Mode</span><strong>${clusterDevices.length ? "cluster_scan" : "mixed"}</strong></div>
+    <div class="summary-item"><span>Current cluster</span><strong>${currentCluster}</strong></div>
+    <div class="summary-item"><span>Sweep age</span><strong>${sweepAge}</strong></div>
+    <div class="summary-item"><span>Active channels</span><strong>${activeChannels}</strong></div>
+    <div class="summary-item"><span>Input overflows</span><strong>${inputOverflows}</strong></div>
+    <div class="summary-item"><span>Output overruns</span><strong>${outputOverruns}</strong></div>
+  `;
+}
+
+function renderReceiveHistory(status) {
+  const recent = collectChannels(status)
+    .filter(channel => channel.last_received_ms)
+    .sort((a, b) => b.last_received_ms - a.last_received_ms)
+    .slice(0, 20);
+
+  receiveHistoryEl.innerHTML = `
+    <div class="section-title">
+      <strong>Recently received</strong>
+      <span>${recent.length ? `${recent.length} frequencies` : "No receive events yet"}</span>
+    </div>
+    <table class="history-table">
+      <thead>
+        <tr><th>Last received</th><th>MHz</th><th>State</th><th>Hits</th><th>Cluster</th><th>Label</th></tr>
+      </thead>
+      <tbody>
+        ${recent.map(channel => `
+          <tr class="${channel.scanning ? "active-cluster" : ""}">
+            <td>${lastReceivedText(channel.last_received_ms)}</td>
+            <td>${mhz(channel.frequency)}</td>
+            <td class="state-${channel.state}">${channel.state}</td>
+            <td>${channel.hits}</td>
+            <td>${channel.cluster_index + 1} @ ${mhz(channel.cluster_center)}</td>
+            <td class="history-label">${channel.label || ""}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="6" class="empty-state">No received frequencies since last state reset.</td></tr>`}
+      </tbody>
+    </table>
+  `;
+}
+
 function renderStatus(status) {
   healthEl.textContent = "online";
   healthEl.classList.add("online");
   subtitleEl.textContent = `status ${ageText(status.timestamp_ms)}`;
+  renderHealthSummary(status);
+  renderReceiveHistory(status);
 
   devicesEl.innerHTML = "";
   for (const device of status.devices || []) {
